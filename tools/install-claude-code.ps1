@@ -82,9 +82,73 @@ if (Test-Command 'claude') {
 }
 
 # ----------------------------------------------------------------------------
+# Requisito de Windows: bash. Viene con Git for Windows.
+# El instalador nativo falla con "requires Git for Windows or PowerShell" si no está.
+# ----------------------------------------------------------------------------
+function Ensure-GitBash {
+    # ¿Ya hay un bash.exe utilizable?
+    $bash = Get-Command 'bash.exe' -ErrorAction SilentlyContinue
+    if ($bash) {
+        $env:CLAUDE_CODE_GIT_BASH_PATH = $bash.Source
+        Write-Ok "bash detectado: $($bash.Source)"
+        return $true
+    }
+
+    # Rutas típicas de Git for Windows
+    $gitBashCandidates = @(
+        "$env:ProgramFiles\Git\bin\bash.exe",
+        "${env:ProgramFiles(x86)}\Git\bin\bash.exe",
+        "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
+    )
+    foreach ($c in $gitBashCandidates) {
+        if ($c -and (Test-Path $c)) {
+            $env:CLAUDE_CODE_GIT_BASH_PATH = $c
+            Write-Ok "Git Bash encontrado: $c"
+            return $true
+        }
+    }
+
+    Write-Step "Falta 'bash' (Git for Windows). Intentando instalar Git for Windows..."
+    if (Test-Command 'winget') {
+        try {
+            winget install --id Git.Git -e --source winget `
+                --accept-package-agreements --accept-source-agreements
+        } catch {
+            Write-Warn2 "winget falló al instalar Git: $($_.Exception.Message)"
+        }
+        # Refrescar PATH de la sesión
+        $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+        $userPath    = [Environment]::GetEnvironmentVariable('Path', 'User')
+        $env:Path    = @($machinePath, $userPath) -join ';'
+    }
+    elseif (Test-Command 'choco') {
+        try { choco install git -y } catch { Write-Warn2 "choco falló: $($_.Exception.Message)" }
+    }
+
+    # Reintentar detección tras instalar
+    foreach ($c in $gitBashCandidates) {
+        if ($c -and (Test-Path $c)) {
+            $env:CLAUDE_CODE_GIT_BASH_PATH = $c
+            Write-Ok "Git Bash instalado: $c"
+            return $true
+        }
+    }
+    $bash = Get-Command 'bash.exe' -ErrorAction SilentlyContinue
+    if ($bash) { $env:CLAUDE_CODE_GIT_BASH_PATH = $bash.Source; return $true }
+
+    Write-Warn2 "No se pudo instalar Git for Windows automáticamente."
+    Write-Host "   Descárgalo desde: https://git-scm.com/downloads/win" -ForegroundColor Yellow
+    return $false
+}
+
+# ----------------------------------------------------------------------------
 # 1) Método nativo (instalador oficial de Anthropic)
 # ----------------------------------------------------------------------------
 function Install-Native {
+    if (-not (Ensure-GitBash)) {
+        Write-Warn2 "El instalador nativo necesita bash (Git for Windows) y no está disponible."
+        return $false
+    }
     Write-Step "Instalando Claude Code con el instalador oficial de Anthropic..."
     try {
         # El instalador oficial se descarga y ejecuta desde claude.ai

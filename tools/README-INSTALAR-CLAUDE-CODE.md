@@ -74,6 +74,27 @@ powershell -ExecutionPolicy Bypass -File .\install-claude-code.ps1 -Method npm
 
 ---
 
+## Requisito de Windows: `bash` (Git for Windows)
+
+En Windows, Claude Code necesita **bash**, que viene con **Git for Windows**.
+Si al instalar ves este error:
+
+```
+Claude Code on Windows requires either Git for Windows (for bash) or PowerShell.
+```
+
+instala Git for Windows y vuelve a intentarlo:
+
+```powershell
+winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements
+```
+
+> El instalador `install-claude-code.ps1` de este repo **ya lo instala solo**
+> automáticamente antes de instalar Claude Code, así que con la Opción A o B no
+> tienes que hacer nada más.
+
+---
+
 ## Problemas frecuentes
 
 - **"No se puede ejecutar scripts en este sistema"**: usa siempre
